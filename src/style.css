@@ -1,0 +1,18 @@
+* {
+	margin:0;
+	padding:0;
+	box-sizing: border-box;
+}
+body {
+	font-size:16px;
+	background: black;
+}
+canvas {
+	position: absolute;
+	left: 0;
+	top: 0;
+	background: white;
+}
+.game {
+	position: relative;
+}
