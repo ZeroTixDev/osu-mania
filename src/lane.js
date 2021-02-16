@@ -31,6 +31,7 @@ module.exports = class Lane {
          }
          if (!this.playingMiss) {
             missSound.play();
+            missSound.volume = 0.7;
             this.playingMiss = true;
             missSound.addEventListener(
                'ended',

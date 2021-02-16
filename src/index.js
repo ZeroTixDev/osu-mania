@@ -150,6 +150,7 @@ async function startGame() {
    music.addEventListener('play', () => {
       game.started = true;
    });
+   music.volume = 0.6;
    music.play();
 }
 
