@@ -8,13 +8,32 @@ const Control = require('./control');
 const Note = require('./note');
 const Lane = require('./lane');
 
-const { CANVAS_WIDTH, CANVAS_HEIGHT, noteSize, targetY } = require('./constants');
+const { CANVAS_WIDTH, CANVAS_HEIGHT, noteSize, targetY, BOARD_WIDTH } = require('./constants');
+
+const MAPS = {
+   insight: {
+      background: loadImage('insight.png'),
+      data: require('./insight.json'),
+      song: loadSound('insight.mp3'),
+      name: 'Insight',
+   },
+   ing: {
+      background: loadImage('in-the-garden.jpg'),
+      data: require('./in-the-garden.json'),
+      song: loadSound('in-the-garden.mp3'),
+      name: 'In the Garden',
+   },
+};
+
+const MAP = MAPS['ing'];
 
 const background = {
-   image: loadImage('insight.png'),
+   image: MAP.background,
    x: 0,
    y: 0,
 };
+
+const rate = 1;
 
 const judgements = {
    miss: [loadImage('miss.png')],
@@ -24,12 +43,11 @@ const judgements = {
    perfect: [loadImage('perfect.png')],
    excellent: [loadImage('excellent-1.png'), loadImage('excellent-2.png'), loadImage('excellent-3.png')],
 };
-const mapData = require('./map.json');
-const boardWidth = Math.round(CANVAS_WIDTH / 2.5);
+const mapData = MAP.data;
 const board = {
-   x: Math.round(CANVAS_WIDTH / 2 - boardWidth / 2),
+   x: Math.round(CANVAS_WIDTH / 2 - BOARD_WIDTH / 2),
    y: 0,
-   width: boardWidth,
+   width: BOARD_WIDTH,
    height: CANVAS_HEIGHT,
 };
 const startText = {
@@ -41,11 +59,12 @@ const startText = {
    size: 25,
 };
 const lanesCount = 4;
-const laneWidth = Math.round(boardWidth / lanesCount);
+const laneWidth = Math.round(BOARD_WIDTH / lanesCount);
 const lanes = makeLanes(lanesCount, ['KeyS', 'KeyD', 'KeyL', 'Semicolon']);
 
 const controls = mapControls(['KeyS', 'KeyD', 'KeyL', 'Semicolon', 'Space', 'KeyM']);
 const hitControls = { KeyS: 0, KeyD: 1, KeyL: 2, Semicolon: 3 };
+
 const keyDown = {};
 
 const game = {
@@ -64,8 +83,8 @@ const game = {
 
 const showJudgementTime = 0.5;
 const scoreUpTime = 0.2;
-const minimumShowScoreUpHits = 10;
-const MAP = true;
+const minimumShowScoreUpHits = 8;
+const MAKING_MAP = true;
 const map_notes = [];
 
 const canvas = document.querySelector('.main-canvas');
@@ -95,7 +114,9 @@ function updateTimer(object, delta, max) {
    }
    return false;
 }
-function updateGame(delta) {
+
+function updateGame(dt) {
+   const delta = dt * rate;
    if (keyDown['Space'] && !game.started) {
       startGame();
    }
@@ -112,7 +133,8 @@ function updateGame(delta) {
       game.show = null;
    }
    if (updateTimer(game.scoreUp, delta, scoreUpTime)) {
-      game.scoreUp = null;
+      game.scoreUp.hits--;
+      game.scoreUp.hits = Math.max(game.scoreUp.hits, 0);
    }
    if (game.show && game.show.size) {
       game.show.size += delta * 0.8;
@@ -123,7 +145,7 @@ function updateGame(delta) {
 }
 
 function drawBoard() {
-   ctx.fillStyle = 'rgba(0, 0, 0, 0.95)';
+   ctx.fillStyle = 'rgba(0, 0, 0, 1)';
    ctx.fillRect(board.x, board.y, board.width, board.height);
 }
 function drawLanes() {
@@ -139,18 +161,19 @@ function renderGame() {
       return;
    }
    drawBoard();
-   bottomCircles();
    drawLanes();
+   bottomCircles();
    drawScore();
 }
 
 async function startGame() {
    await parseNotes(mapData.notes);
-   const music = loadSound('insight.mp3');
+   const music = MAP.song;
    music.addEventListener('play', () => {
       game.started = true;
    });
    music.volume = 0.2;
+   music.playbackRate = rate;
    music.play();
 }
 
@@ -164,7 +187,7 @@ function renderStartText() {
    ctx.fillText('press space to start', startText.x, startText.y);
    ctx.font = `${Math.round(startText.size - 5)}px Arial`;
    ctx.fillText('controls: [s, d, l, ;]', startText.x, startText.y + 50);
-   ctx.fillText('Map: Insight', startText.x, startText.y + 100);
+   ctx.fillText(`Map: ${MAP.name}`, startText.x, startText.y + 100);
 }
 
 function updateStartText(delta) {
@@ -197,15 +220,18 @@ function bottomCircles() {
    for (let i = 0; i < lanesCount; i++) {
       const x = Math.round(board.x + i * laneWidth + laneWidth / 2);
       const keydown = keyDown[lanes[i].key] !== undefined && keyDown[lanes[i].key] != false;
+      ctx.fillStyle = 'black';
+      ctx.beginPath();
+      ctx.arc(x, targetY, noteSize, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
       if (keydown) {
-         ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+         ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
       }
       ctx.beginPath();
       ctx.arc(x, targetY, noteSize, 0, Math.PI * 2);
       ctx.stroke();
-      if (keydown) {
-         ctx.fill();
-      }
+      ctx.fill();
    }
 }
 
@@ -213,7 +239,7 @@ function drawScore() {
    ctx.fillStyle = game.scoreUp != null && game.scoreUp.hits >= minimumShowScoreUpHits ? '#dbc70f' : 'white';
    ctx.textAlign = 'center';
    ctx.textBaseline = 'middle';
-   ctx.font = '50px Arial';
+   ctx.font = `${50 + 4 * Math.min(2, game.scoreUp?.hits ?? 0 / minimumShowScoreUpHits)}px Mukta`;
    ctx.fillText(game.score, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 100);
    if (game.show != null) {
       let image = judgements[game.show.type][0];
@@ -236,7 +262,7 @@ function drawScore() {
    ctx.textAlign = 'start';
    ctx.textBaseline = 'alphabetic';
    ctx.fillRect(0, 0, 250, 200);
-   ctx.font = '25px Arial';
+   ctx.font = '25px Mukta';
    ctx.fillStyle = 'white';
    ctx.fillText(`Notes Hit: ${game.notesHit}`, 20, 40);
    ctx.fillText(`Notes Miss: ${game.notesMiss}`, 20, 70);
@@ -281,7 +307,7 @@ function trackKeys(event) {
          keyDown[event.code] = true;
          detectHit(event.code);
          control.lock = true;
-         if (event.code === 'KeyM' && MAP) {
+         if (event.code === 'KeyM' && MAKING_MAP) {
             console.log('console logging map making notes....');
             console.log(JSON.stringify(map_notes));
          }
@@ -314,7 +340,7 @@ function parseNotes(notes) {
 }
 
 function detectHit(code) {
-   if (MAP && hitControls[String(code)] != undefined) {
+   if (MAKING_MAP && hitControls[String(code)] != undefined) {
       map_notes.push([hitControls[String(code)], round(game.timer, 2)]);
    }
    if (!game.started || hitControls[String(code)] === undefined) return;
@@ -337,11 +363,11 @@ function detectHit(code) {
       }
    }
    const timeBetween = Math.abs(game.timer - note.time);
-   if (timeBetween < 0.05) {
+   if (timeBetween < 0.04) {
       hit();
       game.show = { type: 'excellent', timer: 0, size: 0.08 };
       game.noteScore += 3;
-   } else if (timeBetween < 0.09) {
+   } else if (timeBetween < 0.08) {
       hit();
       game.show = { type: 'perfect', timer: 0, size: 0.08 };
       game.noteScore += 3;
@@ -349,7 +375,7 @@ function detectHit(code) {
       hit();
       game.show = { type: 'great', timer: 0, size: 0.08 };
       game.noteScore += 2;
-   } else if (timeBetween < 0.15) {
+   } else if (timeBetween < 0.16) {
       hit();
       game.show = { type: 'good', timer: 0, size: 0.08 };
       game.noteScore += 1;

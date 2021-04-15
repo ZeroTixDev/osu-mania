@@ -5,5 +5,6 @@ module.exports = {
    CANVAS_HEIGHT: 720,
    targetY: 645,
    noteSize: 40,
-   scrollSpeed: 1400,
+   scrollSpeed: 1350,
+   BOARD_WIDTH: 450,
 };

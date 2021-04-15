@@ -16,7 +16,7 @@ module.exports = class Note {
          return false;
       }
       ctx.beginPath();
-      ctx.arc(this.x, y, noteSize, 0, Math.PI * 2);
+      ctx.arc(this.x, Math.min(targetY, y), noteSize, 0, Math.PI * 2);
       ctx.fill();
       return true;
    }
