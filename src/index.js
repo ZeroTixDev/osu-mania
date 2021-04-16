@@ -8,7 +8,7 @@ const Control = require('./control');
 const Note = require('./note');
 const Lane = require('./lane');
 
-const { CANVAS_WIDTH, CANVAS_HEIGHT, noteSize, targetY, BOARD_WIDTH } = require('./constants');
+const { CANVAS_WIDTH, CANVAS_HEIGHT, noteSize, targetY, BOARD_WIDTH, RATE } = require('./constants');
 
 const MAPS = {
    insight: {
@@ -25,15 +25,24 @@ const MAPS = {
    },
 };
 
-const MAP = MAPS['ing'];
+let MAP = MAPS['ing'];
+
+const params = new URLSearchParams(window.location.search);
+
+if (params.has('map')) {
+   const map = params.get('map');
+   if (map === 'insight') {
+      MAP = MAPS['insight'];
+   } else if (map === 'in-the-garden') {
+      MAP = MAPS['ing'];
+   }
+}
 
 const background = {
    image: MAP.background,
    x: 0,
    y: 0,
 };
-
-const rate = 1;
 
 const judgements = {
    miss: [loadImage('miss.png')],
@@ -96,7 +105,7 @@ window.addEventListener('resize', () => resizeCanvas([canvas]));
 
 let lastTime = 0;
 
-background.image.addEventListener('load', () => {
+window.addEventListener('load', () => {
    (function run(time = 0) {
       const delta = (time - lastTime) / 1000;
       lastTime = time;
@@ -116,7 +125,7 @@ function updateTimer(object, delta, max) {
 }
 
 function updateGame(dt) {
-   const delta = dt * rate;
+   const delta = dt * RATE;
    if (keyDown['Space'] && !game.started) {
       startGame();
    }
@@ -168,13 +177,62 @@ function renderGame() {
 
 async function startGame() {
    await parseNotes(mapData.notes);
-   const music = MAP.song;
-   music.addEventListener('play', () => {
-      game.started = true;
+   window.music = MAP.song;
+   game.started = true;
+   window.music.volume = 0.4;
+   window.music.playbackRate = RATE;
+   window.music.play();
+   // leaderboard part
+
+   window.music.addEventListener('ended', function handle() {
+      const leaderboard = document.querySelector('.leaderboard-container');
+      const leaderboardDiv = document.querySelector('.leaderboard');
+      const gameDiv = document.querySelector('.game');
+
+      leaderboardDiv.classList.remove('hidden');
+      gameDiv.classList.add('hidden');
+
+      const name = String(prompt('Want to submit this score to the leaderboard!? Put your name here!')).slice(0, 15);
+
+      window.ws = new WebSocket('wss://osu-mania-leaderboard.zerotixdev.repl.co');
+
+      window.ws.addEventListener('open', () => {
+         const max = (game.notesHit + game.notesMiss) * 3;
+         const accuracy = round((game.noteScore / max) * 100, 2);
+         window.ws.send(JSON.stringify({ type: 'func', mode: 'set', name, score: accuracy, map: MAP.name }));
+      });
+
+      window.ws.addEventListener('message', (msg) => {
+         const data = JSON.parse(msg.data);
+         if (data.info) {
+            const array = [...data.info];
+            array.sort((a, b) => b.score - a.score);
+            const html = array.reduce(
+               (acc, cur) =>
+                  acc +
+                  `
+				<div class="leaderboard-div">
+					<h1 class="leaderboard-name">${cur.name}</h1>
+					<h1 class="leaderboard-score">${cur.score}%</h1>
+					<h1 class="leaderboard-map">${cur.map}</h1>
+				</div>
+				`,
+               ''
+            );
+            leaderboard.innerHTML = html;
+         }
+      });
+
+      setInterval(() => {
+         if (window.ws === undefined || window.ws.readyState !== 1) return;
+         window.ws.send(JSON.stringify({ type: 'refresh' }));
+      }, 2000);
+
+      window.ws.addEventListener('close', () => {
+         alert('The connection has closed. Try refreshing or check your connection');
+      });
+      window.music.removeEventListener('ended', handle);
    });
-   music.volume = 0.2;
-   music.playbackRate = rate;
-   music.play();
 }
 
 function renderStartText() {

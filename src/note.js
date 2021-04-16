@@ -1,6 +1,6 @@
 'use strict';
 
-const { noteSize, targetY, scrollSpeed, CANVAS_HEIGHT } = require('./constants');
+const { noteSize, targetY, scrollSpeed, CANVAS_HEIGHT, RATE } = require('./constants');
 
 module.exports = class Note {
    constructor(x, time) {
