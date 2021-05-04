@@ -10,71 +10,28 @@ const Lane = require('./lane');
 
 const { CANVAS_WIDTH, CANVAS_HEIGHT, noteSize, targetY, BOARD_WIDTH, RATE } = require('./constants');
 
-const MAPS = {
-   insight: {
-      background: loadImage('insight.png'),
-      data: require('./insight.json'),
-      song: loadSound('insight.mp3'),
-      name: 'Insight',
+const MAPS = [
+   {
+      background: loadImage('after-school-navigators.png'),
+      data: require('./after-school-navigators.json'),
+      song: loadSound('after-school-navigators.mp3'),
+      name: 'Navigators',
    },
-   ing: {
+   {
       background: loadImage('in-the-garden.jpg'),
       data: require('./in-the-garden.json'),
       song: loadSound('in-the-garden.mp3'),
       name: 'In the Garden',
    },
-};
+   {
+      background: loadImage('insight.png'),
+      data: require('./insight.json'),
+      song: loadSound('insight.mp3'),
+      name: 'Insight',
+   },
+];
 
-let MAP = MAPS['ing'];
-
-const params = new URLSearchParams(window.location.search);
-
-if (params.has('map')) {
-   const map = params.get('map');
-   if (map === 'insight') {
-      MAP = MAPS['insight'];
-   } else if (map === 'in-the-garden') {
-      MAP = MAPS['ing'];
-   }
-}
-
-const background = {
-   image: MAP.background,
-   x: 0,
-   y: 0,
-};
-
-const judgements = {
-   miss: [loadImage('miss.png')],
-   bad: [loadImage('bad.png')],
-   good: [loadImage('good.png')],
-   great: [loadImage('great.png')],
-   perfect: [loadImage('perfect.png')],
-   excellent: [loadImage('excellent-1.png'), loadImage('excellent-2.png'), loadImage('excellent-3.png')],
-};
-const mapData = MAP.data;
-const board = {
-   x: Math.round(CANVAS_WIDTH / 2 - BOARD_WIDTH / 2),
-   y: 0,
-   width: BOARD_WIDTH,
-   height: CANVAS_HEIGHT,
-};
-const startText = {
-   x: Math.round(CANVAS_WIDTH / 2),
-   y: Math.round(CANVAS_HEIGHT / 2 + CANVAS_HEIGHT / 5),
-   range: [30, 40],
-   speed: 20,
-   up: false,
-   size: 25,
-};
-const lanesCount = 4;
-const laneWidth = Math.round(BOARD_WIDTH / lanesCount);
-const lanes = makeLanes(lanesCount, ['KeyS', 'KeyD', 'KeyL', 'Semicolon']);
-
-const controls = mapControls(['KeyS', 'KeyD', 'KeyL', 'Semicolon', 'Space', 'KeyM']);
-const hitControls = { KeyS: 0, KeyD: 1, KeyL: 2, Semicolon: 3 };
-
-const keyDown = {};
+let mapIndex = 0;
 
 const game = {
    started: false,
@@ -88,7 +45,58 @@ const game = {
    scoreUp: null,
    excellentCount: 0,
    noteScore: 0,
+   get map() {
+      return MAPS[mapIndex];
+   },
 };
+
+// const params = new URLSearchParams(window.location.search);
+
+// if (params.has('map')) {
+//    const map = params.get('map');
+//    if (map === 'insight') {
+//       game.map = MAPS['insight'];
+//    } else if (map === 'in-the-garden') {
+//       game.map = MAPS['ing'];
+//    }
+// }
+
+const background = {
+   x: 0,
+   y: 0,
+};
+
+const judgements = {
+   miss: [loadImage('miss.png')],
+   bad: [loadImage('bad.png')],
+   good: [loadImage('good.png')],
+   great: [loadImage('great.png')],
+   perfect: [loadImage('perfect.png')],
+   excellent: [loadImage('excellent-1.png'), loadImage('excellent-2.png'), loadImage('excellent-3.png')],
+};
+const board = {
+   x: Math.round(CANVAS_WIDTH / 2 - BOARD_WIDTH / 2),
+   y: 0,
+   width: BOARD_WIDTH,
+   height: CANVAS_HEIGHT,
+};
+const startText = {
+   x: Math.round(CANVAS_WIDTH / 2),
+   y: Math.round(CANVAS_HEIGHT / 2 + CANVAS_HEIGHT / 3.5),
+   speed: 20,
+   up: false,
+   size: 60,
+};
+const lanesCount = 4;
+const laneWidth = Math.round(BOARD_WIDTH / lanesCount);
+const lanes = makeLanes(lanesCount, ['KeyS', 'KeyD', 'KeyL', 'Semicolon']);
+
+const controls = mapControls(['KeyS', 'KeyD', 'KeyL', 'Semicolon', 'Space', 'KeyM'], { type: 'game' });
+controls['ArrowLeft'] = new Control('menu');
+controls['ArrowRight'] = new Control('menu');
+const hitControls = { KeyS: 0, KeyD: 1, KeyL: 2, Semicolon: 3 };
+
+const keyDown = {};
 
 const showJudgementTime = 0.5;
 const scoreUpTime = 0.2;
@@ -105,7 +113,7 @@ window.addEventListener('resize', () => resizeCanvas([canvas]));
 
 let lastTime = 0;
 
-window.addEventListener('load', () => {
+window.addEventListener('DOMContentLoaded', () => {
    (function run(time = 0) {
       const delta = (time - lastTime) / 1000;
       lastTime = time;
@@ -130,7 +138,7 @@ function updateGame(dt) {
       startGame();
    }
    if (!game.started) {
-      updateStartText(delta);
+      // updateStartText(delta);
       return;
    }
    game.timer += delta;
@@ -164,7 +172,7 @@ function drawLanes() {
 }
 function renderGame() {
    ctx.clearRect(0, 0, canvas.width, canvas.height);
-   ctx.drawImage(background.image, background.x, background.y, canvas.width, canvas.height);
+   ctx.drawImage(game.map.background, background.x, background.y, canvas.width, canvas.height);
    if (!game.started) {
       renderStartText();
       return;
@@ -176,11 +184,13 @@ function renderGame() {
 }
 
 async function startGame() {
-   await parseNotes(mapData.notes);
-   window.music = MAP.song;
-   game.started = true;
-   window.music.volume = 0.4;
+   await parseNotes(game.map.data.notes);
+   window.music = game.map.song;
+   window.music.volume = 0.2;
    window.music.playbackRate = RATE;
+   window.music.onplay = () => {
+      game.started = true;
+   };
    window.music.play();
    // leaderboard part
 
@@ -197,9 +207,10 @@ async function startGame() {
       window.ws = new WebSocket('wss://osu-mania-leaderboard.zerotixdev.repl.co');
 
       window.ws.addEventListener('open', () => {
+         if (name === null || !/\S/.test(name) === true) return;
          const max = (game.notesHit + game.notesMiss) * 3;
          const accuracy = round((game.noteScore / max) * 100, 2);
-         window.ws.send(JSON.stringify({ type: 'func', mode: 'set', name, score: accuracy, map: MAP.name }));
+         window.ws.send(JSON.stringify({ type: 'func', mode: 'set', name, score: accuracy, map: game.map.name }));
       });
 
       window.ws.addEventListener('message', (msg) => {
@@ -236,38 +247,42 @@ async function startGame() {
 }
 
 function renderStartText() {
-   ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-   ctx.fillRect(startText.x - 200, startText.y - 50, 400, 200);
+   ctx.fillStyle = 'rgba(0, 0, 0, 0.95)';
+   ctx.fillRect(startText.x - 300, startText.y - 50, 600, 200);
    ctx.fillStyle = 'white';
+   ctx.font = `100px Arial`;
    ctx.textAlign = 'center';
    ctx.textBaseline = 'middle';
+   ctx.fillText(`❮`, startText.x - 250, startText.y + 50);
+   ctx.fillText(`❯`, startText.x + 250, startText.y + 50);
+   // ctx.font = `${Math.round(startText.size)}px Arial`;
+   // ctx.fillText('press space to start', startText.x, startText.y);
+   // ctx.font = `${Math.round(startText.size - 5)}px Arial`;
+   // ctx.fillText('controls: [s, d, l, ;]', startText.x, startText.y + 50);
    ctx.font = `${Math.round(startText.size)}px Arial`;
-   ctx.fillText('press space to start', startText.x, startText.y);
-   ctx.font = `${Math.round(startText.size - 5)}px Arial`;
-   ctx.fillText('controls: [s, d, l, ;]', startText.x, startText.y + 50);
-   ctx.fillText(`Map: ${MAP.name}`, startText.x, startText.y + 100);
+   ctx.fillText(`${game.map.name}`, startText.x, startText.y + 50);
 }
 
-function updateStartText(delta) {
-   if (!startText.up) {
-      startText.size -= startText.speed * delta;
-      if (startText.size <= startText.range[0]) {
-         startText.up = !startText.up;
-         startText.size = startText.range[0];
-      }
-   } else if (startText.up) {
-      startText.size += startText.speed * delta;
-      if (startText.size >= startText.range[1]) {
-         startText.up = !startText.up;
-         startText.size = startText.range[1];
-      }
-   }
-}
+// function updateStartText(delta) {
+//    if (!startText.up) {
+//       startText.size -= startText.speed * delta;
+//       if (startText.size <= startText.range[0]) {
+//          startText.up = !startText.up;
+//          startText.size = startText.range[0];
+//       }
+//    } else if (startText.up) {
+//       startText.size += startText.speed * delta;
+//       if (startText.size >= startText.range[1]) {
+//          startText.up = !startText.up;
+//          startText.size = startText.range[1];
+//       }
+//    }
+// }
 
-function mapControls(controls) {
+function mapControls(controls, { type }) {
    const object = Object.create(null);
    for (const control of controls) {
-      object[control] = new Control();
+      object[control] = new Control(type);
    }
    return object;
 }
@@ -363,11 +378,28 @@ function trackKeys(event) {
    if (event.type === 'keydown') {
       if (!control.lock) {
          keyDown[event.code] = true;
-         detectHit(event.code);
          control.lock = true;
-         if (event.code === 'KeyM' && MAKING_MAP) {
-            console.log('console logging map making notes....');
-            console.log(JSON.stringify(map_notes));
+         if (control.type === 'game') {
+            detectHit(event.code);
+            if (event.code === 'KeyM' && MAKING_MAP) {
+               console.log('console logging map making notes....');
+               console.log(JSON.stringify(map_notes));
+            }
+         } else if (control.type === 'menu') {
+            console.log(event.code);
+            if (event.code === 'ArrowRight') {
+               if (mapIndex >= MAPS.length - 1) {
+                  mapIndex = 0;
+               } else {
+                  mapIndex++;
+               }
+            } else if (event.code === 'ArrowLeft') {
+               if (mapIndex <= 0) {
+                  mapIndex = MAPS.length - 1;
+               } else {
+                  mapIndex--;
+               }
+            }
          }
       }
    } else if (event.type === 'keyup') {

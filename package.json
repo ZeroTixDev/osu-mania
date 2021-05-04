@@ -6,7 +6,8 @@
   "scripts": {
     "start": "webpack serve --config config/webpack.prod.js",
     "build": "webpack --config config/webpack.prod.js",
-    "dev": "webpack serve --config config/webpack.dev.js"
+    "dev": "webpack serve --config config/webpack.dev.js",
+    "push": "git push origin master && push-dir --dir=dist --branch=pages"
   },
   "keywords": [],
   "author": "",
@@ -28,5 +29,8 @@
     "webpack-dev-server": "^3.11.0",
     "webpack-merge": "^5.7.3",
     "webpackbar": "^5.0.0-3"
+  },
+  "dependencies": {
+    "push-dir": "^0.4.1"
   }
 }
