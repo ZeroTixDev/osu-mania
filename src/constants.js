@@ -1,11 +1,11 @@
 'use strict';
 
 module.exports = {
-   CANVAS_WIDTH: 1280,
-   CANVAS_HEIGHT: 720,
-   targetY: 655,
-   noteSize: 40,
-   scrollSpeed: 1300,
-   BOARD_WIDTH: 450,
+   CANVAS_WIDTH: 1600,
+   CANVAS_HEIGHT: 900,
+   targetY: 820,
+   noteSize: 50,
+   scrollSpeed: 1400,
+   BOARD_WIDTH: 562.5,
    RATE: 1,
 };

@@ -3,7 +3,8 @@
 require('./style.css');
 
 const { resizeCanvas } = require('./resize');
-const { loadImage, loadSound } = require('./loadAsset');
+const { loadImage } = require('./loadAsset');
+const Map = require('./map');
 const Control = require('./control');
 const Note = require('./note');
 const Lane = require('./lane');
@@ -11,36 +12,48 @@ const Lane = require('./lane');
 const { CANVAS_WIDTH, CANVAS_HEIGHT, noteSize, targetY, BOARD_WIDTH, RATE } = require('./constants');
 
 const MAPS = [
-   {
-      background: loadImage('after-school-navigators.png'),
-      data: require('./after-school-navigators.json'),
-      song: loadSound('after-school-navigators.mp3'),
+   new Map({
+      background: 'giorno-theme.jpg',
+      data: require('./maps/giorno-theme.json'),
+      song: 'giorno-theme.mp3',
+      name: `Giorno's Theme`,
+   }),
+   new Map({
+      background: 'after-school-navigators.png',
+      data: require('./maps/after-school-navigators.json'),
+      song: 'after-school-navigators.mp3',
       name: 'Navigators',
-   },
-   {
-      background: loadImage('in-the-garden.jpg'),
-      data: require('./in-the-garden.json'),
-      song: loadSound('in-the-garden.mp3'),
+   }),
+   new Map({
+      background: 'in-the-garden.jpg',
+      data: require('./maps/in-the-garden.json'),
+      song: 'in-the-garden.mp3',
       name: 'In the Garden',
-   },
-   {
-      background: loadImage('insight.png'),
-      data: require('./insight.json'),
-      song: loadSound('insight.mp3'),
+      offset: 20, //ms
+   }),
+   new Map({
+      background: 'insight.png',
+      data: require('./maps/insight.json'),
+      song: 'insight.mp3',
       name: 'Insight',
-   },
+      offset: 160, //ms
+   }),
 ];
 
 let mapIndex = 0;
+// let globalOffset = 0;
+// let canChangeGlobalOffset = false;
 
 const game = {
    started: false,
    skin: 'circle',
+   startTime: null,
    timer: 0,
    score: 0,
    notesHit: 0,
    notesMiss: 0,
    bestCombo: 0,
+   backgroundAlpha: 0,
    show: null,
    scoreUp: null,
    excellentCount: 0,
@@ -91,7 +104,7 @@ const lanesCount = 4;
 const laneWidth = Math.round(BOARD_WIDTH / lanesCount);
 const lanes = makeLanes(lanesCount, ['KeyS', 'KeyD', 'KeyL', 'Semicolon']);
 
-const controls = mapControls(['KeyS', 'KeyD', 'KeyL', 'Semicolon', 'Space', 'KeyM'], { type: 'game' });
+const controls = mapControls(['KeyS', 'KeyD', 'KeyL', 'Semicolon', 'Space', 'KeyM', 'Enter'], { type: 'game' });
 controls['ArrowLeft'] = new Control('menu');
 controls['ArrowRight'] = new Control('menu');
 const hitControls = { KeyS: 0, KeyD: 1, KeyL: 2, Semicolon: 3 };
@@ -113,12 +126,16 @@ window.addEventListener('resize', () => resizeCanvas([canvas]));
 
 let lastTime = 0;
 
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('load', () => {
    (function run(time = 0) {
       const delta = (time - lastTime) / 1000;
       lastTime = time;
       updateGame(delta);
+      const before = window.performance.now();
       renderGame();
+      if (window.performance.now() - before > 1) {
+         // console.log(`render took ${(window.performance.now() - before).toFixed(1)}ms`);
+      }
       requestAnimationFrame(run);
    })();
 });
@@ -132,20 +149,38 @@ function updateTimer(object, delta, max) {
    return false;
 }
 
+let triggeredStart = false;
+let triggeredGameStart = false;
+
 function updateGame(dt) {
    const delta = dt * RATE;
-   if (keyDown['Space'] && !game.started) {
+   if ((keyDown['Space'] || keyDown['Enter']) && !game.started && !triggeredStart) {
+      triggeredStart = true;
+      console.log('loading game...')
+   }
+   if (triggeredStart && game.map.loaded && !triggeredGameStart) {
+      triggeredGameStart = true;
+      console.log('attempting to start game!');
       startGame();
    }
-   if (!game.started) {
+   if (!game.started || !game.map.loaded) {
       // updateStartText(delta);
       return;
    }
-   game.timer += delta;
+   // game.timer += delta;
+   // if (canChangeGlobalOffset) {
+   //    globalOffset += delta;
+   // }
+   if (game.startTime !== null) {
+      game.counter = ((window.performance.now() - game.startTime) / 1000);
+      game.timer = game.counter + 
+         (game.map.offset !== undefined ? game.map.offset / 1000: 0);
+      game.timer *= RATE;
+   }
    game.excellentCount += judgements['excellent'].length * 5 * delta;
    if (game.excellentCount >= judgements['excellent'].length) {
       game.excellentCount = 0;
-   }
+   }  
    if (updateTimer(game.show, delta, showJudgementTime)) {
       game.show = null;
    }
@@ -159,6 +194,16 @@ function updateGame(dt) {
          game.show.size = 0.15;
       }
    }
+   game.backgroundAlpha += delta * 0.8;
+   if (game.backgroundAlpha >= 0.75 ) {
+      game.backgroundAlpha = 0.75;
+   }
+
+   for (let i = 0; i < lanesCount; i++) {
+      lanes[i].updateParticles(delta);
+   }
+
+   
 }
 
 function drawBoard() {
@@ -170,9 +215,14 @@ function drawLanes() {
       lanes[i].render(game, ctx);
    }
 }
+
 function renderGame() {
    ctx.clearRect(0, 0, canvas.width, canvas.height);
    ctx.drawImage(game.map.background, background.x, background.y, canvas.width, canvas.height);
+   ctx.globalAlpha = game.backgroundAlpha;
+   ctx.fillStyle = 'black'
+   ctx.fillRect(background.x, background.y, canvas.width, canvas.height);
+   ctx.globalAlpha = 1;
    if (!game.started) {
       renderStartText();
       return;
@@ -183,15 +233,21 @@ function renderGame() {
    drawScore();
 }
 
+
 async function startGame() {
    await parseNotes(game.map.data.notes);
    window.music = game.map.song;
    window.music.volume = 0.2;
    window.music.playbackRate = RATE;
-   window.music.onplay = () => {
-      game.started = true;
-   };
-   window.music.play();
+   game.started = true;
+   // globalOffset = -0.5;
+   // canChangeGlobalOffset = true;
+   setTimeout(() => {
+      window.music.onplay = () => {
+         game.startTime = window.performance.now();
+      };
+      window.music.play();
+   }, 500);
    // leaderboard part
 
    window.music.addEventListener('ended', function handle() {
@@ -247,7 +303,7 @@ async function startGame() {
 }
 
 function renderStartText() {
-   ctx.fillStyle = 'rgba(0, 0, 0, 0.95)';
+   ctx.fillStyle = 'rgba(0, 0, 0, 0.99)';
    ctx.fillRect(startText.x - 300, startText.y - 50, 600, 200);
    ctx.fillStyle = 'white';
    ctx.font = `100px Arial`;
@@ -312,8 +368,10 @@ function drawScore() {
    ctx.fillStyle = game.scoreUp != null && game.scoreUp.hits >= minimumShowScoreUpHits ? '#dbc70f' : 'white';
    ctx.textAlign = 'center';
    ctx.textBaseline = 'middle';
-   ctx.font = `${50 + 4 * Math.min(2, game.scoreUp?.hits ?? 0 / minimumShowScoreUpHits)}px Mukta`;
+   ctx.font = `${50 * 1.15 + 4  * 0.8 * Math.min(2, game.scoreUp?.hits ?? 0 / minimumShowScoreUpHits)}px Mukta`;
    ctx.fillText(game.score, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2 - 100);
+   ctx.imageSmoothingEnabled = true;
+   ctx.imageSmoothingQuality = "high";
    if (game.show != null) {
       let image = judgements[game.show.type][0];
       if (game.show.type === 'excellent' || game.show.type === 'perfect') {
@@ -452,19 +510,71 @@ function detectHit(code) {
          game.scoreUp = { timer: 0, hits: 0 };
       }
    }
+   const index = hitControls[String(code)];
    const timeBetween = Math.abs(game.timer - note.time);
    if (timeBetween < 0.04) {
       hit();
       game.show = { type: 'excellent', timer: 0, size: 0.08 };
       game.noteScore += 3;
+      // add particles
+      for (let i = 0; i < 30; i++) {
+         // (x, y, color, speed, time, fadeTime, radiusRange)
+         lane.addParticle({
+            x: board.x + index * laneWidth + Math.random() * laneWidth,
+            y: (targetY + noteSize) - Math.random() * (noteSize * 2), 
+            color: '#03ffb3',
+            speed: 60,
+            time: 0.1,
+            fadeTime: 0.5,
+            radiusRange: [3, 10]
+         })
+      }
+      for (let i = 0; i < 10; i++) {
+         // (x, y, color, speed, time, fadeTime, radiusRange)
+         lane.addParticle({
+            x: board.x + index * laneWidth + Math.random() * laneWidth,
+            y: (targetY + noteSize) - Math.random() * (noteSize * 2), 
+            color: '#03ffb3',
+            speed: 60,
+            time: 0.1,
+            fadeTime: 0.5,
+            radiusRange: [6, 16]
+         })
+      }
    } else if (timeBetween < 0.08) {
       hit();
       game.show = { type: 'perfect', timer: 0, size: 0.08 };
       game.noteScore += 3;
+      // add particles
+      for (let i = 0; i < 25; i++) {
+         // (x, y, color, speed, time, fadeTime, radiusRange)
+         lane.addParticle({
+            x: board.x + index * laneWidth + Math.random() * laneWidth,
+            y: (targetY + noteSize) - Math.random() * (noteSize * 2), 
+            color: '#02c460',
+            speed: 60,
+            time: 0.1,
+            fadeTime: 0.5,
+            radiusRange: [5, 10]
+         })
+      }
    } else if (timeBetween < 0.12) {
       hit();
       game.show = { type: 'great', timer: 0, size: 0.08 };
       game.noteScore += 2;
+       // add particles
+      for (let i = 0; i < 10; i++) {
+         // (x, y, color, speed, time, fadeTime, radiusRange)
+         lane.addParticle({
+            x: board.x + index * laneWidth + Math.random() * laneWidth,
+            y: (targetY + noteSize) - Math.random() * (noteSize * 2), 
+            color: '#01802d',
+            speed: 60,
+            time: 0.1,
+            fadeTime: 0.5,
+            radiusRange: [3, 8]
+         })
+      }
    } else if (timeBetween < 0.16) {
       hit();
       game.show = { type: 'good', timer: 0, size: 0.08 };
