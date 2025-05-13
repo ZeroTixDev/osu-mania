@@ -102,12 +102,12 @@ const startText = {
 };
 const lanesCount = 4;
 const laneWidth = Math.round(BOARD_WIDTH / lanesCount);
-const lanes = makeLanes(lanesCount, ['KeyS', 'KeyD', 'KeyL', 'Semicolon']);
+const lanes = makeLanes(lanesCount, ['KeyD', 'KeyF', 'KeyJ', 'KeyK']);
 
-const controls = mapControls(['KeyS', 'KeyD', 'KeyL', 'Semicolon', 'Space', 'KeyM', 'Enter'], { type: 'game' });
+const controls = mapControls(['KeyD', 'KeyF', 'KeyJ', 'KeyK', 'Space', 'KeyM', 'Enter'], { type: 'game' });
 controls['ArrowLeft'] = new Control('menu');
 controls['ArrowRight'] = new Control('menu');
-const hitControls = { KeyS: 0, KeyD: 1, KeyL: 2, Semicolon: 3 };
+const hitControls = { KeyD: 0, KeyF: 1, KeyJ: 2, KeyK: 3 };
 
 const keyDown = {};
 
