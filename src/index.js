@@ -218,7 +218,9 @@ function drawLanes() {
 
 function renderGame() {
    ctx.clearRect(0, 0, canvas.width, canvas.height);
-   ctx.drawImage(game.map.background, background.x, background.y, canvas.width, canvas.height);
+   if (game.map.background.complete) {
+   	ctx.drawImage(game.map.background, background.x, background.y, canvas.width, canvas.height);
+   }
    ctx.globalAlpha = game.backgroundAlpha;
    ctx.fillStyle = 'black'
    ctx.fillRect(background.x, background.y, canvas.width, canvas.height);
